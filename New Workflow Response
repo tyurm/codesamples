@@ -1,0 +1,91 @@
+LOCAL PROCEDURE ChangeApprStatusToApprovedCode@1100111001() : Code[128];
+BEGIN
+  EXIT('ChangeVendorApprovalStatusToApproved');
+END;
+
+[EventSubscriber(Codeunit,1521,OnAddWorkflowResponsesToLibrary)]
+LOCAL PROCEDURE AddChangeApprStatusToApprovedToLibrary@1100111002();
+VAR
+  WorkflowResponseHandling@1100111000 : Codeunit 1521;
+BEGIN
+  WorkflowResponseHandling.AddResponseToLibrary(ChangeApprStatusToApprovedCode,DATABASE::Vendor,'Change "Approval Status" to Approved.','GROUP 50000')
+END;
+
+LOCAL PROCEDURE ChangeApprStatusToApprovedResponse@1100111004(VAR Variant@1100111002 : Variant);
+VAR
+  Vendor@1100111001 : Record 23;
+  ApprovalEntry@1100111003 : Record 454;
+  ApprovalEntry2@1100111005 : Record 454;
+  TargetRecRef@1100111004 : RecordRef;
+  RecRef@1100111000 : RecordRef;
+BEGIN
+  RecRef.GETTABLE(Variant);
+  CASE RecRef.NUMBER OF
+    DATABASE::"Approval Entry":
+      BEGIN
+        ApprovalEntry := Variant;
+
+        ApprovalEntry2.SETCURRENTKEY("Table ID","Document Type","Document No.","Sequence No.");
+        ApprovalEntry2.SETRANGE("Record ID to Approve",ApprovalEntry."Record ID to Approve");
+        ApprovalEntry2.SETRANGE(Status,ApprovalEntry.Status::Open);
+        IF ApprovalEntry2.ISEMPTY THEN BEGIN
+          TargetRecRef.GET(ApprovalEntry."Record ID to Approve");
+          Variant := TargetRecRef;
+          ChangeApprStatusToApprovedResponse(Variant);
+        END;
+      END;
+    DATABASE::Vendor:
+      BEGIN
+        Vendor := Variant;
+        Vendor.VALIDATE("Approval Status",Vendor."Approval Status"::Approved);
+        Vendor.MODIFY(TRUE);
+        Variant := Vendor;
+      END;
+  END;
+END;
+
+[EventSubscriber(Codeunit,1521,OnExecuteWorkflowResponse)]
+LOCAL PROCEDURE ExecuteChangeApprovalStatusResponse@1100111003(VAR ResponseExecuted@1100111000 : Boolean;Variant@1100111001 : Variant;xVariant@1100111002 : Variant;ResponseWorkflowStepInstance@1100111003 : Record 1504);
+VAR
+  WorkflowResponse@1100111004 : Record 1521;
+BEGIN
+  IF WorkflowResponse.GET(ResponseWorkflowStepInstance."Function Name") THEN
+    CASE WorkflowResponse."Function Name" OF
+      ChangeApprStatusToApprovedCode:
+        BEGIN
+          ChangeApprStatusToApprovedResponse(Variant);
+          ResponseExecuted := TRUE;
+        END;
+      ChangeApprStatusToPendingApprovalCode:
+        BEGIN
+          ChangeApprStatusToPendingApprovalResponse(Variant);
+          ResponseExecuted := TRUE;
+        END;
+      ChangeApprStatusToOpenCode:
+        BEGIN
+          ChangeApprStatusToOpenResponse(Variant);
+          ResponseExecuted := TRUE;
+        END;
+      CreateApprovalNotificationToDocSenderCode:
+        BEGIN
+          CreateApprovalNotificationToDocSenderResponse(xVariant,ResponseWorkflowStepInstance);
+          ResponseExecuted := TRUE;
+        END;
+    END;
+END;
+
+[EventSubscriber(Codeunit,1521,OnAddWorkflowResponsePredecessorsToLibrary)]
+LOCAL PROCEDURE AddMyWorkflowEventResponseCombinationsToLibrary@1100111005(ResponseFunctionName@1100111002 : Code[128]);
+VAR
+  MyWorkflowEvents@1100111000 : Codeunit 50003;
+  WorkflowResponseHandling@1100111001 : Codeunit 1521;
+BEGIN
+  CASE ResponseFunctionName OF
+    ChangeApprStatusToApprovedCode:
+      WorkflowResponseHandling.AddResponsePredecessor(ChangeApprStatusToApprovedCode,MyWorkflowEvents.ChangeApprStatusToApprovedCode);
+    ChangeApprStatusToPendingApprovalCode:
+      WorkflowResponseHandling.AddResponsePredecessor(ChangeApprStatusToPendingApprovalCode,MyWorkflowEvents.ChangeApprStatusToPendingApprovalCode);
+    ChangeApprStatusToOpenCode:
+      WorkflowResponseHandling.AddResponsePredecessor(ChangeApprStatusToOpenCode,MyWorkflowEvents.ChangeApprStatusToOpenCode);
+  END;
+END;
