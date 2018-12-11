@@ -1,0 +1,280 @@
+OBJECT Codeunit 50005 Customer & Vendor Sync
+{
+  OBJECT-PROPERTIES
+  {
+    Date=12/09/18;
+    Time=[ 5:04:56 PM];
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+    TableNo=472;
+    OnRun=BEGIN
+            IF UPPERCASE("Parameter String") = 'CUSTOMERS' THEN BEGIN
+              OpenSQLDatabase;
+              ProcessCustomers;
+              CloseSQLDatabase;
+            END;
+            IF UPPERCASE("Parameter String") = 'VENDORS' THEN BEGIN
+              OpenSQLDatabase;
+              ProcessVendors;
+              CloseSQLDatabase;
+            END;
+            IF "Parameter String" = '' THEN BEGIN
+              OpenSQLDatabase;
+              ProcessCustomers;
+              CloseSQLDatabase;
+              COMMIT;
+              OpenSQLDatabase;
+              ProcessVendors;
+              CloseSQLDatabase;
+            END;
+          END;
+
+  }
+  CODE
+  {
+    VAR
+      Setup@1100111006 : Record 50002;
+      MyConnection@1100111005 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlConnection";
+      MyConnectionCommand@1100111004 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlCommand";
+      MyConnectionParameter@1100111003 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlParameter";
+      MyConnectionDataReader@1100111002 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlDataReader";
+      MyConnectionSQLAdapter@1100111001 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlDataAdapter";
+      ConfigTemplateManagement@1100111009 : Codeunit 8612;
+      ConnectionString@1100111000 : Text;
+      DimSetupNotExist@1100111008 : TextConst 'ENU=Dimension mapping does not exist for Dimension Code - %1, Dimension Value - %2.';
+      GLSetup@1100358000 : Record 98;
+      NoSeriesMgt@1100358001 : Codeunit 396;
+
+    LOCAL PROCEDURE OpenSQLDatabase@1100111000() : Boolean;
+    BEGIN
+      GetAndCheckSetup;
+
+      ConnectionString := PhoenixSetup."SQL Server Connection String";
+
+      MyConnection := MyConnection.SqlConnection(ConnectionString);
+      MyConnection.Open();
+    END;
+
+    LOCAL PROCEDURE CloseSQLDatabase@1100111001() : Boolean;
+    BEGIN
+      MyConnection.Close();
+    END;
+
+    LOCAL PROCEDURE ProcessCustomers@1100111002();
+    VAR
+      SelectCommandText@1100111000 : Text;
+      i@1100111001 : Integer;
+    BEGIN
+      GLSetup.GET; 
+      IF FORMAT(MyConnection.State()) = 'Open' THEN BEGIN
+        MyConnectionCommand := MyConnection.CreateCommand;
+        SelectCommandText := 'SELECT * FROM ' + PhoenixSetup."Customer Table Name";
+        SelectCommandText += ' ORDER BY DateLastUpdated DESC';
+        MyConnectionCommand.CommandText := SelectCommandText;
+        MyConnectionDataReader := MyConnectionCommand.ExecuteReader;
+        WHILE MyConnectionDataReader.Read DO BEGIN
+          IF NOT SyncCustomer THEN
+            EXIT;
+        END;
+      END;
+    END;
+
+    LOCAL PROCEDURE ProcessVendors@1100111014();
+    VAR
+      SelectCommandText@1100111000 : Text;
+    BEGIN
+      IF FORMAT(MyConnection.State()) = 'Open' THEN BEGIN
+        MyConnectionCommand := MyConnection.CreateCommand;
+        SelectCommandText := 'SELECT * FROM ' + PhoenixSetup."Vendor Table Name";
+        SelectCommandText += ' ORDER BY DateLastUpdated DESC';
+        MyConnectionCommand.CommandText := SelectCommandText;
+        MyConnectionDataReader := MyConnectionCommand.ExecuteReader;
+        WHILE MyConnectionDataReader.Read DO BEGIN
+          IF NOT SyncVendor THEN
+            EXIT;
+        END;
+      END;
+    END;
+
+    LOCAL PROCEDURE InsertNewCustomer@1100111005(VAR TempCustomer@1100111000 : TEMPORARY Record 18;DimensionValue@1100111002 : ARRAY [4] OF Text);
+    VAR
+      Customer@1100111001 : Record 18;
+      Vendor@1100111003 : Record 23;
+      ConfigTemplateHeader@1100111006 : Record 8618;
+      MiniCustomerTemplate@1100111005 : Record 1300;
+      PhoenixNAVFieldMapping@1100111004 : Record 50005;
+      CustomerRecRef@1100111007 : RecordRef;
+    BEGIN
+      Customer.INIT;
+      Customer."No." := TempCustomer."No.";
+      Customer.INSERT(TRUE);
+
+      ConfigTemplateHeader.GET(PhoenixSetup."Customer Template");
+      CustomerRecRef.GETTABLE(Customer);
+      ConfigTemplateManagement.UpdateRecord(ConfigTemplateHeader,CustomerRecRef);
+      CustomerRecRef.SETTABLE(Customer);
+
+      UpdateCustomer(Customer,TempCustomer,DimensionValue);
+    END;
+
+    LOCAL PROCEDURE UpdateCustomer@1100111004(VAR Customer@1100111001 : Record 18;VAR TempCustomer@1100111000 : TEMPORARY Record 18;DimensionValue@1100111002 : ARRAY [4] OF Text);
+    VAR
+      Broker@1100111004 : Record 23;
+      PhoenixNAVFieldMapping@1100111003 : Record 50005;
+    BEGIN
+      Customer.Name := TempCustomer.Name;
+      Customer."Name 2" :=  TempCustomer."Name 2";
+      Customer.Contact := TempCustomer.Contact;
+
+      Customer."Phone No." := TempCustomer."Phone No.";
+      Customer."E-Mail" := TempCustomer."E-Mail";
+      Customer."Fax No." := TempCustomer."Fax No.";
+      Customer."Mobile Phone No." := TempCustomer."Mobile Phone No.";
+      Customer.VALIDATE("Currency Code",TempCustomer."Currency Code");
+      Customer.Address := TempCustomer.Address;
+      Customer."Address 2" := TempCustomer."Address 2";
+      Customer."Address 3" := TempCustomer."Address 3";
+      Customer.City := TempCustomer.City;
+      Customer.County := TempCustomer.County;
+      Customer."Post Code" := TempCustomer."Post Code";
+      Customer."Country/Region Code" := TempCustomer."Country/Region Code";
+      Customer."Partner Type" := TempCustomer."Partner Type";
+      Customer.VALIDATE("Payment Terms Code",'');
+
+      Customer."Last Date Updated" := TempCustomer."Phoenix Last Date Updated";
+      Customer.MODIFY;
+      DefineDefaultDimensions(DATABASE::Customer,Customer."No.",DimensionValue);
+    END;
+
+    LOCAL PROCEDURE DefineDefaultDimensions@1100111013(TableID@1100111002 : Integer;"No."@1100111004 : Code[20];DimensionValue@1100111000 : ARRAY [4] OF Text) : Integer;
+    VAR
+      FieldsMapping@1100111001 : Record 50005;
+      DefaultDim@1100111003 : Record 352;
+    BEGIN
+      IF FieldsMapping.GET(FieldsMapping."Field Type"::xxx,DimensionValue[1]) THEN BEGIN
+        IF DefaultDim.GET(TableID,"No.",'xxx') THEN BEGIN
+          IF DefaultDim."Dimension Value Code" <> FieldsMapping."NAV Value 1" THEN BEGIN
+            DefaultDim.VALIDATE("Dimension Value Code",FieldsMapping."NAV Value 1");
+            DefaultDim.MODIFY(TRUE);
+          END;
+        END ELSE BEGIN
+          DefaultDim.INIT;
+          DefaultDim.VALIDATE("Table ID",TableID);
+          DefaultDim.VALIDATE("No.","No.");
+          DefaultDim.VALIDATE("Dimension Code",'xxx');
+          DefaultDim.VALIDATE("Dimension Value Code",FieldsMapping."NAV Value 1");
+          DefaultDim.INSERT(TRUE);
+        END;
+      END ELSE
+        IF (DimensionValue[1] <> '') THEN
+          ERROR(DimSetupNotExist,FORMAT(FieldsMapping."Field Type"::xxx),DimensionValue[1]);
+
+     END;
+
+    LOCAL PROCEDURE GetAndCheckSetup@1100111003();
+    BEGIN
+      PhoenixSetup.GET();
+      PhoenixSetup.TESTFIELD("SQL Server Connection String");
+      PhoenixSetup.TESTFIELD("Customer Table Name");
+      PhoenixSetup.TESTFIELD("Vendor Table Name");
+      PhoenixSetup.TESTFIELD("Customer Template");
+      PhoenixSetup.TESTFIELD("Vendor Template");
+      PhoenixSetup.TESTFIELD("xxx Vendor Nos.");
+    END;
+
+    LOCAL PROCEDURE SyncCustomer@1100111007() : Boolean;
+    VAR
+      TempCustomer@1100111000 : TEMPORARY Record 18;
+      Customer@1100111003 : Record 18;
+      CustomerNo@1100111002 : Code[20];
+      DimensionValue@1100111001 : ARRAY [4] OF Text;
+      ContactType@1100111004 : Code[1];
+    BEGIN
+      TempCustomer.DELETEALL;
+      CLEAR(DimensionValue);
+
+      CustomerNo := FORMAT(MyConnectionDataReader.Item(0));
+
+      TempCustomer.INIT;
+      TempCustomer."No." := CustomerNo;
+      TempCustomer.Name := COPYSTR(MyConnectionDataReader.Item(1),1,50);
+      TempCustomer."Name 2" :=  COPYSTR(MyConnectionDataReader.Item(1),51,100);
+      TempCustomer.Contact := FORMAT(MyConnectionDataReader.Item(2));
+      TempCustomer.Address := FORMAT(MyConnectionDataReader.Item(3));
+      TempCustomer."Address 2" := FORMAT(MyConnectionDataReader.Item(4));
+      TempCustomer."Address 3" := FORMAT(MyConnectionDataReader.Item(5));
+      TempCustomer.City := FORMAT(MyConnectionDataReader.Item(6));
+      TempCustomer.County := FORMAT(MyConnectionDataReader.Item(7));
+      TempCustomer."Post Code" := FORMAT(MyConnectionDataReader.Item(8));
+      TempCustomer."E-Mail" := FORMAT(MyConnectionDataReader.Item(10));
+      TempCustomer."Phone No." := FORMAT(MyConnectionDataReader.Item(11));
+      TempCustomer."Other Phone No." := FORMAT(MyConnectionDataReader.Item(22)); //TI
+      TempCustomer."Fax No." := FORMAT(MyConnectionDataReader.Item(12));
+      TempCustomer."Mobile Phone No." := FORMAT(MyConnectionDataReader.Item(13));
+      TempCustomer."Currency Code" := FORMAT(MyConnectionDataReader.Item(14));
+
+      EVALUATE(TempCustomer."Last Date Updated",MyConnectionDataReader.Item(21));
+      TempCustomer.INSERT;
+
+      DimensionValue[1] := FORMAT(MyConnectionDataReader.Item(15)); //DimensionValue[1] = 
+      DimensionValue[2] := FORMAT(MyConnectionDataReader.Item(16)); //DimensionValue[2] = 
+      DimensionValue[3] := FORMAT(MyConnectionDataReader.Item(18)); //DimensionValue[3] = 
+                                                                    //DimensionValue[4] = 
+      IF NOT Customer.GET(TempCustomer."No.") THEN
+        InsertNewCustomer(TempCustomer,DimensionValue)
+      ELSE BEGIN
+        IF Customer."Last Date Updated" < TempCustomer."Last Date Updated" THEN
+          UpdateCustomer(Customer,TempCustomer,DimensionValue)
+        ELSE
+          //EXIT(FALSE); //STOP EXECUTION
+          EXIT(TRUE); //CONTINUE EXECUTION
+      END;
+      EXIT(TRUE);
+    END;
+
+    EVENT MyConnectionSQLAdapter@1100111001::RowUpdated@45(sender@1100111001 : Variant;e@1100111000 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlRowUpdatedEventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnectionSQLAdapter@1100111001::RowUpdating@46(sender@1100111001 : Variant;e@1100111000 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlRowUpdatingEventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnectionSQLAdapter@1100111001::FillError@47(sender@1100111001 : Variant;e@1100111000 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.FillErrorEventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnectionSQLAdapter@1100111001::Disposed@48(sender@1100111001 : Variant;e@1100111000 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.EventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnectionCommand@1100111004::StatementCompleted@59(sender@1100111001 : Variant;e@1100111000 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.StatementCompletedEventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnectionCommand@1100111004::Disposed@60(sender@1100111001 : Variant;e@1100111000 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.EventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnection@1100111005::InfoMessage@53(sender@1100111001 : Variant;e@1100111000 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.SqlClient.SqlInfoMessageEventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnection@1100111005::StateChange@54(sender@1100111001 : Variant;e@1100111000 : DotNet "'System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Data.StateChangeEventArgs");
+    BEGIN
+    END;
+
+    EVENT MyConnection@1100111005::Disposed@55(sender@1100111001 : Variant;e@1100111000 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.EventArgs");
+    BEGIN
+    END;
+
+    BEGIN
+    {
+    }
+    END.
+  }
+}
+
