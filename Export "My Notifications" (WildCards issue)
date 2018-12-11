@@ -1,0 +1,119 @@
+OBJECT Report 50036 Record Link Export to Excel
+{
+  OBJECT-PROPERTIES
+  {
+    Date=04/04/18;
+    Time=10:22:13 AM;
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+    ProcessingOnly=Yes;
+    OnPostReport=BEGIN
+                   CreateExcelBook;
+                 END;
+
+  }
+  DATASET
+  {
+    { 1000000000;;DataItem;                  ;
+               DataItemTable=Table2000000068;
+               OnPreDataItem=BEGIN
+                               "Record Link".SETRANGE(Company,COMPANYNAME);
+                               "Record Link".SETRANGE("To User ID",USERID);
+                               "Record Link".SETRANGE(Notify,TRUE);
+                               "Record Link".SETAUTOCALCFIELDS(Note);
+
+                               ExcelBuffer.AddColumn(Caption1,FALSE,'',TRUE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                               ExcelBuffer.AddColumn(Caption2,FALSE,'',TRUE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                               ExcelBuffer.AddColumn(Caption4,FALSE,'',TRUE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                               ExcelBuffer.AddColumn(Caption3,FALSE,'',TRUE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                               ExcelBuffer.NewRow;
+                             END;
+
+               OnAfterGetRecord=VAR
+                                  StreamReader@1000000001 : DotNet "'mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.StreamReader";
+                                  Encoding@1000000005 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Text.Encoding";
+                                  IStream@1000000000 : InStream;
+                                  NoteText@1000000002 : Text;
+                                  NoteText2@1000000003 : Text;
+                                  BinaryReader@1000000006 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.BinaryReader";
+                                  MemoryStream@1000000007 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.MemoryStream";
+                                BEGIN
+
+                                  "Record Link".Note.CREATEINSTREAM(IStream);
+
+                                  //Fix WildCards
+                                  MemoryStream := MemoryStream.MemoryStream;
+                                  MemoryStream := IStream;
+                                  BinaryReader := BinaryReader.BinaryReader(MemoryStream);
+                                  NoteText :=BinaryReader.ReadString();
+
+                                  // fix multiline print
+                                  IF STRLEN(NoteText) > 500 THEN
+                                    NoteText := DELSTR(NoteText,500,STRLEN(NoteText));
+
+                                  IF STRLEN(NoteText) > 250 THEN BEGIN
+                                    NoteText2 := COPYSTR(NoteText,250,499);
+                                    NoteText := DELSTR(NoteText,250,STRLEN(NoteText));
+                                  END;
+
+                                  IF STRLEN(NoteText2) > 250 THEN
+                                    NoteText2 := DELSTR(NoteText2,250,STRLEN(NoteText));
+
+                                  ExcelBuffer.AddColumn("Record Link"."User ID",FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                  ExcelBuffer.AddColumn("Record Link".Created,FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                  ExcelBuffer.AddColumn("Record Link".Description,FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                  ExcelBuffer.AddColumn(NoteText,FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                  ExcelBuffer.NewRow;
+
+                                  IF NoteText2 <> '' THEN BEGIN
+                                    ExcelBuffer.AddColumn('',FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                    ExcelBuffer.AddColumn('',FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                    ExcelBuffer.AddColumn('',FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                    ExcelBuffer.AddColumn(NoteText2,FALSE,'',FALSE,FALSE,FALSE,'',ExcelBuffer."Cell Type"::Text);
+                                    ExcelBuffer.NewRow;
+                                  END;
+                                END;
+                                 }
+
+  }
+  REQUESTPAGE
+  {
+    PROPERTIES
+    {
+    }
+    CONTROLS
+    {
+    }
+  }
+  LABELS
+  {
+  }
+  CODE
+  {
+    VAR
+      ExcelBuffer@1000000000 : TEMPORARY Record 370;
+      Caption1@1000000001 : TextConst 'ENU=From';
+      Caption2@1000000004 : TextConst 'ENU=Created Date';
+      Caption3@1000000003 : TextConst 'ENU=Note';
+      Caption4@1000000002 : TextConst 'ENU=Page';
+
+    LOCAL PROCEDURE CreateExcelBook@10014501();
+    BEGIN
+      ExcelBuffer.CreateBookAndOpenExcel('','My Notifications','',COMPANYNAME,USERID);
+      ExcelBuffer.DELETEALL;
+    END;
+
+    BEGIN
+    {
+
+    }
+    END.
+  }
+  RDLDATA
+  {
+  }
+}
+
