@@ -1,3 +1,9 @@
+After all function were added, workflow should be setup:
+1. Create workflow from standard template.
+2. Open new workflow.
+3. Open page 1507 "WF Event/Response Combinations" from Dev.
+
+
 LOCAL PROCEDURE ChangeApprStatusToApprovedCode@1100111001() : Code[128];
 BEGIN
   EXIT('ChangeVendorApprovalStatusToApproved');
@@ -45,7 +51,7 @@ BEGIN
 END;
 
 [EventSubscriber(Codeunit,1521,OnExecuteWorkflowResponse)]
-LOCAL PROCEDURE ExecuteChangeApprovalStatusResponse@1100111003(VAR ResponseExecuted@1100111000 : Boolean;Variant@1100111001 : Variant;xVariant@1100111002 : Variant;ResponseWorkflowStepInstance@1100111003 : Record 1504);
+LOCAL PROCEDURE ExecuteResponse@1100111003(VAR ResponseExecuted@1100111000 : Boolean;Variant@1100111001 : Variant;xVariant@1100111002 : Variant;ResponseWorkflowStepInstance@1100111003 : Record 1504);
 VAR
   WorkflowResponse@1100111004 : Record 1521;
 BEGIN
@@ -56,24 +62,10 @@ BEGIN
           ChangeApprStatusToApprovedResponse(Variant);
           ResponseExecuted := TRUE;
         END;
-      ChangeApprStatusToPendingApprovalCode:
-        BEGIN
-          ChangeApprStatusToPendingApprovalResponse(Variant);
-          ResponseExecuted := TRUE;
-        END;
-      ChangeApprStatusToOpenCode:
-        BEGIN
-          ChangeApprStatusToOpenResponse(Variant);
-          ResponseExecuted := TRUE;
-        END;
-      CreateApprovalNotificationToDocSenderCode:
-        BEGIN
-          CreateApprovalNotificationToDocSenderResponse(xVariant,ResponseWorkflowStepInstance);
-          ResponseExecuted := TRUE;
-        END;
     END;
 END;
 
+//??
 [EventSubscriber(Codeunit,1521,OnAddWorkflowResponsePredecessorsToLibrary)]
 LOCAL PROCEDURE AddMyWorkflowEventResponseCombinationsToLibrary@1100111005(ResponseFunctionName@1100111002 : Code[128]);
 VAR
@@ -88,4 +80,53 @@ BEGIN
     ChangeApprStatusToOpenCode:
       WorkflowResponseHandling.AddResponsePredecessor(ChangeApprStatusToOpenCode,MyWorkflowEvents.ChangeApprStatusToOpenCode);
   END;
+END;
+
+
+//Notification Response  
+LOCAL PROCEDURE CreateApprovalNotificationToDocSenderCode@1100111017() : Code[128];
+BEGIN
+  EXIT('CreateApprovalNotificationToSender');
+END;
+
+[EventSubscriber(Codeunit,1521,OnAddWorkflowResponsesToLibrary)]
+LOCAL PROCEDURE AddCreateApprNotifToDocSenderToLibrary@1100111018();
+VAR
+  WorkflowResponseHandling@1100111000 : Codeunit 1521;
+BEGIN
+  WorkflowResponseHandling.AddResponseToLibrary(CreateApprovalNotificationToDocSenderCode,DATABASE::"Purchase Header",'Create Approval Notification to Sender','GROUP 50000')
+END;
+
+LOCAL PROCEDURE CreateApprovalNotificationToDocSenderResponse@1100111020(ApprovalEntry@1100111001 : Record 454;WorkflowStepInstance@1100111000 : Record 1504);
+VAR
+  WorkflowStepArgument@1100111004 : Record 1523;
+  NotificationEntry@1100111003 : Record 1511;
+  UserSetup@1100111002 : Record 91;
+BEGIN
+  IF NOT WorkflowStepArgument.GET(WorkflowStepInstance.Argument) THEN
+    EXIT;
+
+  IF WorkflowStepArgument."Notification User ID" = '' THEN BEGIN
+    WorkflowStepArgument.VALIDATE("Notification User ID",ApprovalEntry."Sender ID");
+  END;
+
+  ApprovalEntry.RESET;
+  NotificationEntry.CreateNew(
+    NotificationEntry.Type::Approval,WorkflowStepArgument."Notification User ID",
+    ApprovalEntry,WorkflowStepArgument."Link Target Page",WorkflowStepArgument."Custom Link");
+END;
+
+[EventSubscriber(Codeunit,1521,OnExecuteWorkflowResponse)]
+LOCAL PROCEDURE ExecuteResponse@1100111003(VAR ResponseExecuted@1100111000 : Boolean;Variant@1100111001 : Variant;xVariant@1100111002 : Variant;ResponseWorkflowStepInstance@1100111003 : Record 1504);
+VAR
+  WorkflowResponse@1100111004 : Record 1521;
+BEGIN
+  IF WorkflowResponse.GET(ResponseWorkflowStepInstance."Function Name") THEN
+    CASE WorkflowResponse."Function Name" OF
+      CreateApprovalNotificationToDocSenderCode:
+        BEGIN
+          CreateApprovalNotificationToDocSenderResponse(xVariant,ResponseWorkflowStepInstance);
+          ResponseExecuted := TRUE;
+        END;
+    END;
 END;
