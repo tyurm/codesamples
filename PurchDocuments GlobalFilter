@@ -1,0 +1,39 @@
+    [EventSubscriber(Codeunit,1,OnAfterCompanyOpen)]
+    LOCAL PROCEDURE SetUserGroupFilter@1100111016();
+    VAR
+      UserSetup@1100111006 : Record 91;
+      LinkedWorkflowUserGroup@1100111000 : Record 50010;
+      PurchaseHeader@1100111002 : Record 38;
+      PurchInvHeader@1100111003 : Record 122;
+      PurchRcptHeader@1100111004 : Record 120;
+      PurchCrMemoHdr@1100111005 : Record 124;
+      GroupFilter@1100111001 : Text;
+    BEGIN
+      IF UserSetup.GET(USERID) AND UserSetup."All Groups Review" THEN
+        EXIT;
+
+      LinkedWorkflowUserGroup.RESET;
+      LinkedWorkflowUserGroup.SETRANGE("User Name",USERID);
+      IF LinkedWorkflowUserGroup.FINDSET THEN
+        REPEAT
+          IF GroupFilter <> '' THEN
+            GroupFilter += '|';
+          GroupFilter += LinkedWorkflowUserGroup."Workflow User Group Code";
+        UNTIL LinkedWorkflowUserGroup.NEXT = 0;
+
+      PurchaseHeader.FILTERGROUP(1);
+      PurchaseHeader.SETFILTER("Approval Group",GroupFilter);
+      PurchaseHeader.FILTERGROUP(0);
+
+      PurchInvHeader.FILTERGROUP(1);
+      PurchInvHeader.SETFILTER("Approval Group",GroupFilter);
+      PurchInvHeader.FILTERGROUP(0);
+
+      PurchRcptHeader.FILTERGROUP(1);
+      PurchRcptHeader.SETFILTER("Approval Group",GroupFilter);
+      PurchRcptHeader.FILTERGROUP(0);
+
+      PurchCrMemoHdr.FILTERGROUP(1);
+      PurchCrMemoHdr.SETFILTER("Approval Group",GroupFilter);
+      PurchCrMemoHdr.FILTERGROUP(0);
+    END;
