@@ -1,0 +1,3 @@
+//Get objects from CRM
+New-NavCrmTable -CRMServer *TEST*.crm.dynamics.com -Credential (Get-Credential -UserName *TEST@test.com* -Message "Enter Password") -EntityLogicalName *CRM Name* -Name *NAV Name* -ObjectId *50011* -OutputPath c:\CrmObjects
+
