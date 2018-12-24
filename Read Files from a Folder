@@ -1,0 +1,74 @@
+OBJECT Codeunit 50000 Read Files in Subfolders
+{
+  OBJECT-PROPERTIES
+  {
+    Date=24.12.18;
+    Time=12:28:04;
+    Modified=Yes;
+    Version List=;
+  }
+  PROPERTIES
+  {
+
+    OnRun=BEGIN
+          END;
+
+  }
+  CODE
+  {
+    LOCAL PROCEDURE AddFilesToTemp@1(VAR File2@1000 : Record 2000000022;Path2@1001 : Text;SearchPattern@1002 : Text);
+    VAR
+      Folder@1005 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.Directory";
+      FolderList@1100111001 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Collections.Generic.List`1";
+      List@1004 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Collections.Generic.List`1";
+      Object@1003 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.Object";
+      Path@1007 : DotNet "'mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'.System.IO.Path";
+      FileCounter@1006 : Integer;
+      FolderCounter@1100111003 : Integer;
+      FolderPath@1100111002 : Text;
+    BEGIN
+      IF ImportSubfolders THEN BEGIN
+        Object := Folder.GetDirectories(Path2);
+        FolderList := FolderList.List;
+        FolderList.AddRange(Object);
+        FolderCounter := 0;
+        WHILE FolderCounter < FolderList.Count DO BEGIN
+          FolderPath :=  Path.GetDirectoryName(FORMAT(FolderList.Item(FolderCounter)) + '\');
+          Object := Folder.GetFiles(FolderPath, SearchPattern);
+          List := List.List;
+          List.AddRange(Object);
+          FileCounter := 0;
+          WHILE FileCounter < List.Count DO BEGIN
+            File2.INIT;
+            File2.Path := Path2;
+            File2."Is a file" := TRUE;
+            File2.Name := Path.GetFileName(FORMAT(List.Item(FileCounter)));
+            File2.INSERT;
+            FileCounter += 1;
+          END;
+          FolderCounter += 1;
+        END;
+      END;
+
+      Object := Folder.GetFiles(Path2, SearchPattern);
+      List := List.List;
+      List.AddRange(Object);
+      FileCounter := 0;
+      WHILE FileCounter < List.Count DO BEGIN
+        File2.INIT;
+        File2.Path := Path2;
+        File2."Is a file" := TRUE;
+        File2.Name := Path.GetFileName(FORMAT(List.Item(FileCounter)));
+        File2.INSERT;
+        FileCounter += 1;
+      END;
+    END;
+
+    BEGIN
+    {
+
+    }
+    END.
+  }
+}
+
