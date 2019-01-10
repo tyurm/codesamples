@@ -71,7 +71,7 @@ OBJECT Codeunit 50005 Customer & Vendor Sync
       GLSetup.GET; 
       IF FORMAT(MyConnection.State()) = 'Open' THEN BEGIN
         MyConnectionCommand := MyConnection.CreateCommand;
-        SelectCommandText := 'SELECT * FROM ' + PhoenixSetup."Customer Table Name";
+        SelectCommandText := 'SELECT * FROM ' + Setup."Customer Table Name";
         SelectCommandText += ' ORDER BY DateLastUpdated DESC';
         MyConnectionCommand.CommandText := SelectCommandText;
         MyConnectionDataReader := MyConnectionCommand.ExecuteReader;
@@ -88,7 +88,7 @@ OBJECT Codeunit 50005 Customer & Vendor Sync
     BEGIN
       IF FORMAT(MyConnection.State()) = 'Open' THEN BEGIN
         MyConnectionCommand := MyConnection.CreateCommand;
-        SelectCommandText := 'SELECT * FROM ' + PhoenixSetup."Vendor Table Name";
+        SelectCommandText := 'SELECT * FROM ' + Setup."Vendor Table Name";
         SelectCommandText += ' ORDER BY DateLastUpdated DESC';
         MyConnectionCommand.CommandText := SelectCommandText;
         MyConnectionDataReader := MyConnectionCommand.ExecuteReader;
@@ -112,7 +112,7 @@ OBJECT Codeunit 50005 Customer & Vendor Sync
       Customer."No." := TempCustomer."No.";
       Customer.INSERT(TRUE);
 
-      ConfigTemplateHeader.GET(PhoenixSetup."Customer Template");
+      ConfigTemplateHeader.GET(Setup."Customer Template");
       CustomerRecRef.GETTABLE(Customer);
       ConfigTemplateManagement.UpdateRecord(ConfigTemplateHeader,CustomerRecRef);
       CustomerRecRef.SETTABLE(Customer);
@@ -176,13 +176,13 @@ OBJECT Codeunit 50005 Customer & Vendor Sync
 
     LOCAL PROCEDURE GetAndCheckSetup@1100111003();
     BEGIN
-      PhoenixSetup.GET();
-      PhoenixSetup.TESTFIELD("SQL Server Connection String");
-      PhoenixSetup.TESTFIELD("Customer Table Name");
-      PhoenixSetup.TESTFIELD("Vendor Table Name");
-      PhoenixSetup.TESTFIELD("Customer Template");
-      PhoenixSetup.TESTFIELD("Vendor Template");
-      PhoenixSetup.TESTFIELD("xxx Vendor Nos.");
+      Setup.GET();
+      Setup.TESTFIELD("SQL Server Connection String");
+      Setup.TESTFIELD("Customer Table Name");
+      Setup.TESTFIELD("Vendor Table Name");
+      Setup.TESTFIELD("Customer Template");
+      Setup.TESTFIELD("Vendor Template");
+      Setup.TESTFIELD("xxx Vendor Nos.");
     END;
 
     LOCAL PROCEDURE SyncCustomer@1100111007() : Boolean;
