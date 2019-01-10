@@ -52,7 +52,7 @@ OBJECT Codeunit 50005 Customer & Vendor Sync
     BEGIN
       GetAndCheckSetup;
 
-      ConnectionString := PhoenixSetup."SQL Server Connection String";
+      ConnectionString := Setup."SQL Server Connection String";
 
       MyConnection := MyConnection.SqlConnection(ConnectionString);
       MyConnection.Open();
