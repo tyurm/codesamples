@@ -1,3 +1,4 @@
 //Get objects from CRM
 New-NavCrmTable -CRMServer *TEST*.crm.dynamics.com -Credential (Get-Credential -UserName *TEST@test.com* -Message "Enter Password") -EntityLogicalName *CRM Name* -Name *NAV Name* -ObjectId *50011* -OutputPath c:\CrmObjects
 
+New-NavContainer -accept_eula -auth NavUserPassword -shortcuts Desktop -includeCSide -doNotExportObjectsToText -containerName "bclatest" -accept_outdated -updateHosts -enableSymbolLoading -memoryLimit 4G -imageName mcr.microsoft.com/businesscentral/sandbox  -useBestContainerOS
